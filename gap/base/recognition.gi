@@ -88,25 +88,25 @@ InstallMethod( ViewObj, "for recognition infos", [IsRecognitionInfo],
 
 InstallGlobalFunction( RecognisePermGroup,
   function(G)
-    return RecogniseGeneric(G, FindHomDbPerm, "", rec());
+    return RecogniseGeneric(G, FindHomDbPerm, "", rec(), fail);
   end);
 
 InstallGlobalFunction( RecogniseMatrixGroup,
   function(G)
-    return RecogniseGeneric(G, FindHomDbMatrix, "", rec());
+    return RecogniseGeneric(G, FindHomDbMatrix, "", rec(), fail);
   end);
 
 InstallGlobalFunction( RecogniseProjectiveGroup,
   function(G)
-    return RecogniseGeneric(G, FindHomDbProjective, "", rec());
+    return RecogniseGeneric(G, FindHomDbProjective, "", rec(), fail);
   end);
 
 InstallGlobalFunction( RecogniseGroup,
   function(G)
     if IsPermGroup(G) then
-        return RecogniseGeneric(G, FindHomDbPerm, "", rec());
+        return RecogniseGeneric(G, FindHomDbPerm, "", rec(), fail);
     elif IsMatrixGroup(G) then
-        return RecogniseGeneric(G, FindHomDbMatrix, "", rec());
+        return RecogniseGeneric(G, FindHomDbMatrix, "", rec(), fail);
     else
         ErrorNoReturn("Only matrix and permutation groups are supported");
     fi;
@@ -424,11 +424,14 @@ InstallGlobalFunction( PrintTreePos,
     fi;
   end );
 
+NUM_MANDARINS := 100;
+
 InstallGlobalFunction( RecogniseGeneric,
-  function(H, methoddb, depthString, knowledge)
+  function(H, methoddb, depthString, knowledge, mandarins)
     # Assume all the generators have no memory!
     local N,depth,done,i,l,ll,gensNmeth,allmethods,
-          proj1,proj2,ri,rifac,riker,s,x,y,z,succ,counter;
+          proj1,proj2,ri,rifac,riker,s,x,y,z,succ,counter,
+          kernelMandarins,factorMandarins,tmp;
 
     depth := Length(depthString);
 
@@ -436,8 +439,15 @@ InstallGlobalFunction( RecogniseGeneric,
     Info(InfoRecog,4,"Recognising: ",H);
 
     if Length(GeneratorsOfGroup(H)) = 0 then
+        # FIXME: shouldn't we just, like, finish here immediately?
         H := Group([One(H)]);
     fi;
+
+    if mandarins = fail then
+        Assert(0, depth = 0);
+        mandarins := List([1..NUM_MANDARINS], i -> PseudoRandom(H));
+    fi;
+
 
     # Set up the record and the group object:
     if IsIdenticalObj( methoddb, FindHomDbProjective ) then
@@ -488,6 +498,20 @@ InstallGlobalFunction( RecogniseGeneric,
                 SetNiceGens(ri,GeneratorsOfGroup(H));
             fi;
         fi;
+
+        # check mandarins now
+        tmp := NiceGens(ri);
+        for x in mandarins do
+            s := SLPforElement(ri, x);
+            if s = fail then
+                # TODO: should not really happen
+                Error("Mandarins detected bad leaf");
+            fi;
+            # TODO: validate the SLP, too?
+            z := ResultOfStraightLineProgram(s, tmp);
+            Assert(0, ri!.isequal(x, z));
+        od;
+
         # these two were set correctly by FindHomomorphism
         if IsLeaf(ri) then SetFilterObj(ri,IsReady); fi;
         # FIXME: settle what IsReady means *exactly*;
@@ -501,6 +525,18 @@ InstallGlobalFunction( RecogniseGeneric,
 
     # The non-leaf case:
     # In that case we know that ri now knows: homom plus additional data.
+    
+    # map the mandarins
+    factorMandarins := [];
+    for x in mandarins do
+        y := ImageElm(Homom(ri), x);
+        if y = fail then
+            # TODO: deal with this properly
+            Error("Mandarins detected bad factor homom");
+        fi;
+        Add(factorMandarins, y);
+        #s := SLPforElement(ri, x);
+    od;
 
     # Try to recognise the factor a few times, then give up:
     counter := 0;
@@ -528,7 +564,7 @@ InstallGlobalFunction( RecogniseGeneric,
         Add(depthString,'F');
         rifac := RecogniseGeneric(
                   Group(List(GeneratorsOfGroup(H), x->ImageElm(Homom(ri),x))),
-                  methodsforfactor(ri), depthString, forfactor(ri) ); # TODO: change forfactor to hintsForFactor??)
+                  methodsforfactor(ri), depthString, forfactor(ri), factorMandarins ); # TODO: change forfactor to hintsForFactor??)
         Remove(depthString);
         PrintTreePos("F",depthString,H);
         SetRIFac(ri,rifac);
@@ -570,7 +606,7 @@ InstallGlobalFunction( RecogniseGeneric,
         Sort(l,SortFunctionWithMemory);   # this favours "shorter" memories!
         # FIXME: For projective groups different matrices might stand
         #        for the same element, we might overlook this here!
-        # remove duplicates:
+        # remove duplicates and trivial entries:
         ll := [];
         for i in [1..Length(l)] do
             if not isone(ri)(l[i]) and
@@ -580,17 +616,59 @@ InstallGlobalFunction( RecogniseGeneric,
         od;
         SetgensN(ri,ll);
     fi;
+
+    # evaluate mandarins to get kernel mandarins
+    kernelMandarins := [];
+    for i in [1..Length(mandarins)] do
+        x := mandarins[i];
+        y := factorMandarins[i];
+        s := SLPforElement(rifac, y);
+        if s = fail then
+            Error("TODO: no SLP for factor");
+        fi;
+        z := ResultOfStraightLineProgram(s, pregensfac(ri));
+        if not ri!.isequal(x, z) then
+            Add( kernelMandarins, x / z );
+        fi;
+    od;
+#    kernelMandarins := rifac!.kernelMandarins
+
     if Length(gensN(ri)) = 0 then
         # We found out that N is the trivial group!
         # In this case we do nothing, kernel is fail indicating this.
-        Info(InfoRecog,2,"Found trivial kernel (depth=",depth,").");
-        SetRIKer(ri,fail);
-        # We have to learn from the factor, what our nice generators are:
-        SetNiceGens(ri,pregensfac(ri));
-        SetFilterObj(ri,IsReady);
-        if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
-        # StopStoringRandEls(ri);
-        return ri;
+
+        if Length(kernelMandarins) <> 0 then
+            # ooops, mandarins disagree
+            if gensNmeth.method = FindKernelDoNothing then
+                Error("Mandarins detected bad kernel, but gensNmeth is FindKernelDoNothing");
+            elif IsBound(ri!.leavegensNuntouched) then
+                Error("Mandarins detected bad kernel, but leavegensNuntouched is set");
+            else
+                # we need to 
+                # WARNING: do NOT add the mandarin here, even though it may seem tempting.
+                # But (a) they don't have memory, and (b) we need them to stay "clean",
+                # if we start using them for computations, this destroys out assumption
+                # about their independency
+                succ := FindKernelFastNormalClosure(ri,5,5);
+                Info(InfoRecog,2,"Have now ",Length(gensN(ri)),
+                     " generators for kernel, recognising...");
+                # TODO: we should check if we found non-trivial gens now, and also clean out
+                # duplicates etc.; possibly by replicating the code we use above
+                if succ = false then
+                    ErrorNoReturn("Very bad: factor was wrongly recognised and we ",
+                                  "found out too late");
+                fi;
+            fi;
+        else
+            Info(InfoRecog,2,"Found trivial kernel (depth=",depth,").");
+            SetRIKer(ri,fail);
+            # We have to learn from the factor, what our nice generators are:
+            SetNiceGens(ri,pregensfac(ri));
+            SetFilterObj(ri,IsReady);
+            if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
+            # StopStoringRandEls(ri);
+            return ri;
+        fi;
     fi;
 
     Info(InfoRecog,2,"Going to the kernel (depth=",depth,").");
@@ -603,12 +681,14 @@ InstallGlobalFunction( RecogniseGeneric,
         N := Group(StripMemory(gensN(ri)));
 
         Add(depthString,'K');
-        riker := RecogniseGeneric( N, methoddb, depthString, forkernel(ri) );
+        riker := RecogniseGeneric( N, methoddb, depthString, forkernel(ri), kernelMandarins );
         Remove(depthString);
         PrintTreePos("K",depthString,H);
         SetRIKer(ri,riker);
         SetRIParent(riker,ri);
         Info(InfoRecog,2,"Back from kernel (depth=",depth,").");
+
+# TODO: verify kernelMandarins
 
         done := true;
         if IsReady(riker) and immediateverification(ri) then
