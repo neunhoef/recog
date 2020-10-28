@@ -445,6 +445,12 @@ InstallGlobalFunction( RecogniseGeneric,
 
     if mandarins = fail then
         Assert(0, depth = 0);
+        # Use SetPseudoRandomStamp or RandomElm
+        # FIXME: double-check whether mandarins are not reused. Since
+        # PseudoRandom may use RandomElm as the pseudorandomfunc it could
+        # happen that the mandarins are reused.
+        # I think we have to undo the hack to PseudoRandom or, even worse,
+        # remove the mandarins from ri!.randr manually
         mandarins := List([1..NUM_MANDARINS], i -> PseudoRandom(H));
     fi;
 
@@ -537,6 +543,7 @@ InstallGlobalFunction( RecogniseGeneric,
         Add(factorMandarins, y);
         #s := SLPforElement(ri, x);
     od;
+    # sort the factorMandarins and remove duplicates and trivials
 
     # Try to recognise the factor a few times, then give up:
     counter := 0;
@@ -631,6 +638,7 @@ InstallGlobalFunction( RecogniseGeneric,
             Add( kernelMandarins, x / z );
         fi;
     od;
+    # sort the kernelMandarins and remove duplicates and trivials
 #    kernelMandarins := rifac!.kernelMandarins
 
     if Length(gensN(ri)) = 0 then
