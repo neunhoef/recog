@@ -429,9 +429,9 @@ NUM_MANDARINS := 100;
 InstallGlobalFunction( RecogniseGeneric,
   function(H, methoddb, depthString, knowledge, mandarins)
     # Assume all the generators have no memory!
-    local N,depth,done,i,l,ll,gensNmeth,allmethods,
+    local oldRandstore, N,depth,done,i,l,ll,gensNmeth,allmethods,
           proj1,proj2,ri,rifac,riker,s,x,y,z,succ,counter,
-          kernelMandarins,factorMandarins,tmp;
+          kernelMandarins,factorMandarins;
 
     depth := Length(depthString);
 
@@ -445,12 +445,10 @@ InstallGlobalFunction( RecogniseGeneric,
 
     if mandarins = fail then
         Assert(0, depth = 0);
-        # Use SetPseudoRandomStamp or RandomElm
-        # FIXME: double-check whether mandarins are not reused. Since
-        # PseudoRandom may use RandomElm as the pseudorandomfunc it could
-        # happen that the mandarins are reused.
-        # I think we have to undo the hack to PseudoRandom or, even worse,
-        # remove the mandarins from ri!.randr manually
+        # HACK: We don't want the mandarins to be reused by any computation.
+        # Since PseudoRandom is hacked, it is important that we generate the
+        # mandarins before calling EmptyRecognitionInfoRecord. Otherwise the
+        # mandarins would be reused by RandomElm and RandomElmOrd.
         mandarins := List([1..NUM_MANDARINS], i -> PseudoRandom(H));
     fi;
 
@@ -505,17 +503,25 @@ InstallGlobalFunction( RecogniseGeneric,
             fi;
         fi;
 
+        # TODO: In magma the RecogniseGroup analogue creates the mandarins
+        # _and_ stores their SLPs. Why does it store their SLPs? Are these
+        # used?
         # check mandarins now
-        tmp := NiceGens(ri);
         for x in mandarins do
+            # TODO: Do we need these SLPs later when we check the mandarins of
+            # the parent node? If so, then store these SLPs.
             s := SLPforElement(ri, x);
             if s = fail then
                 # TODO: should not really happen
-                Error("Mandarins detected bad leaf");
+                # because we verify leaves immediately?
+                ErrorNoReturn("Mandarins detected bad leaf");
             fi;
             # TODO: validate the SLP, too?
-            z := ResultOfStraightLineProgram(s, tmp);
-            Assert(0, ri!.isequal(x, z));
+            z := ResultOfStraightLineProgram(s, NiceGens(ri));
+            if not ri!.isequal(x, z) then
+                # TODO: deal with this properly
+                ErrorNoReturn("Mandarins detected bad leaf");
+            fi;
         od;
 
         # these two were set correctly by FindHomomorphism
@@ -533,17 +539,29 @@ InstallGlobalFunction( RecogniseGeneric,
     # In that case we know that ri now knows: homom plus additional data.
     
     # map the mandarins
+    # TODO Can we also put the ValidateHomomInput call with
+    # GeneratorsOfGroup(H) here? If it fails we'll need to handle it exactly as
+    # we handle a botched mandarin computation.
+    for x in mandarins do
+        if not ValidateHomomInput(ri, x) then
+            # TODO: deal with this properly, see CompTree's description of what
+            # it does in a "crisis"
+            ErrorNoReturn("Mandarins detected bad factor homom");
+        fi;
+    od;
     factorMandarins := [];
     for x in mandarins do
+        # TODO: magma has separate "test mandarins" and "map mandarins"
+        # functions. Does that improve performance notably?
         y := ImageElm(Homom(ri), x);
         if y = fail then
-            # TODO: deal with this properly
-            Error("Mandarins detected bad factor homom");
+            # TODO: deal with this properly, see above
+            ErrorNoReturn("Mandarins detected bad factor homom");
         fi;
         Add(factorMandarins, y);
         #s := SLPforElement(ri, x);
     od;
-    # sort the factorMandarins and remove duplicates and trivials
+    # TODO: sort the factorMandarins and remove duplicates and trivials
 
     # Try to recognise the factor a few times, then give up:
     counter := 0;
@@ -552,6 +570,7 @@ InstallGlobalFunction( RecogniseGeneric,
         if counter > 10 then
             Info(InfoRecog,1,"Giving up desperately...");
             if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
+            # FIXME For debugging Error instead.
             return ri;
         fi;
 
@@ -625,6 +644,12 @@ InstallGlobalFunction( RecogniseGeneric,
     fi;
 
     # evaluate mandarins to get kernel mandarins
+    # TODO: something is suuper iffy about the method BlocksModScalars, which
+    # is called by BlockDiagonal.
+    # Apparently its input is neither to be understood as a projective nor as a
+    # matrix group, but rather as a "all block-scalars being trivial" group.
+    # That ofc completely wrecks the mandarins, since they assume the group to
+    # be projective.
     kernelMandarins := [];
     for i in [1..Length(mandarins)] do
         x := mandarins[i];
@@ -638,8 +663,7 @@ InstallGlobalFunction( RecogniseGeneric,
             Add( kernelMandarins, x / z );
         fi;
     od;
-    # sort the kernelMandarins and remove duplicates and trivials
-#    kernelMandarins := rifac!.kernelMandarins
+    # TODO: sort the kernelMandarins and remove duplicates and trivials
 
     if Length(gensN(ri)) = 0 then
         # We found out that N is the trivial group!
@@ -648,14 +672,16 @@ InstallGlobalFunction( RecogniseGeneric,
         if Length(kernelMandarins) <> 0 then
             # ooops, mandarins disagree
             if gensNmeth.method = FindKernelDoNothing then
+                # TODO deal with this properly
                 Error("Mandarins detected bad kernel, but gensNmeth is FindKernelDoNothing");
             elif IsBound(ri!.leavegensNuntouched) then
+                # TODO deal with this properly
                 Error("Mandarins detected bad kernel, but leavegensNuntouched is set");
             else
                 # we need to 
                 # WARNING: do NOT add the mandarin here, even though it may seem tempting.
                 # But (a) they don't have memory, and (b) we need them to stay "clean",
-                # if we start using them for computations, this destroys out assumption
+                # if we start using them for computations, this destroys our assumption
                 # about their independency
                 succ := FindKernelFastNormalClosure(ri,5,5);
                 Info(InfoRecog,2,"Have now ",Length(gensN(ri)),
