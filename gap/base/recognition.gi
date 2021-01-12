@@ -734,10 +734,6 @@ InstallGlobalFunction( RecogniseGeneric,
                 x := RandomElm(ri,"KERNELANDVERIFY",true).el;
                 Assert(2, ValidateHomomInput(ri, x));
                 s := SLPforElement(rifac,ImageElm( Homom(ri), x!.el ));
-                if s = fail then
-                    ErrorNoReturn("Very bad: factor was wrongly recognised and we ",
-                                  "found out too late");
-                fi;
                 y := ResultOfStraightLineProgram(s, ri!.pregensfacwithmem);
                 z := x*y^-1;
                 s := SLPforElement(riker,z!.el);
