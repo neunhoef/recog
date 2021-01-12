@@ -425,13 +425,18 @@ InstallGlobalFunction( PrintTreePos,
   end );
 
 NUM_MANDARINS := 100;
+MANDARIN_CRISIS := "TODO";
 
+# TODO: documentation of mandarins.
+# Refer to overview paper by Baarnhielm, Holt, Charles, Eamonn, sections "5.2
+# The main algorithm" and "5.4 Crisis management".
+# Explain safe and unsafe nodes.
 InstallGlobalFunction( RecogniseGeneric,
   function(H, methoddb, depthString, knowledge, mandarins)
     # Assume all the generators have no memory!
     local oldRandstore, N,depth,done,i,l,ll,gensNmeth,allmethods,
           proj1,proj2,ri,rifac,riker,s,x,y,z,succ,counter,
-          kernelMandarins,factorMandarins;
+          mandarin,kernelMandarins,factorMandarins;
 
     depth := Length(depthString);
 
@@ -503,24 +508,13 @@ InstallGlobalFunction( RecogniseGeneric,
             fi;
         fi;
 
-        # TODO: In magma the RecogniseGroup analogue creates the mandarins
-        # _and_ stores their SLPs. Why does it store their SLPs? Are these
-        # used?
+        # TODO: store the mandarins and their SLPs?
         # check mandarins now
         for x in mandarins do
-            # TODO: Do we need these SLPs later when we check the mandarins of
-            # the parent node? If so, then store these SLPs.
             s := SLPforElement(ri, x);
             if s = fail then
-                # TODO: should not really happen
-                # because we verify leaves immediately?
-                ErrorNoReturn("Mandarins detected bad leaf");
-            fi;
-            # TODO: validate the SLP, too?
-            z := ResultOfStraightLineProgram(s, NiceGens(ri));
-            if not ri!.isequal(x, z) then
-                # TODO: deal with this properly
-                ErrorNoReturn("Mandarins detected bad leaf");
+                # TODO
+                return MANDARIN_CRISIS;
             fi;
         od;
 
@@ -538,28 +532,18 @@ InstallGlobalFunction( RecogniseGeneric,
     # The non-leaf case:
     # In that case we know that ri now knows: homom plus additional data.
     
-    # map the mandarins
-    # TODO Can we also put the ValidateHomomInput call with
-    # GeneratorsOfGroup(H) here? If it fails we'll need to handle it exactly as
-    # we handle a botched mandarin computation.
+    # Compute the mandarins of the factor
     for x in mandarins do
         if not ValidateHomomInput(ri, x) then
-            # TODO: deal with this properly, see CompTree's description of what
-            # it does in a "crisis"
-            ErrorNoReturn("Mandarins detected bad factor homom");
+            # TODO
+            return MANDARIN_CRISIS;
         fi;
     od;
     factorMandarins := [];
     for x in mandarins do
-        # TODO: magma has separate "test mandarins" and "map mandarins"
-        # functions. Does that improve performance notably?
         y := ImageElm(Homom(ri), x);
-        if y = fail then
-            # TODO: deal with this properly, see above
-            ErrorNoReturn("Mandarins detected bad factor homom");
-        fi;
+        Assert(2, y <> fail);
         Add(factorMandarins, y);
-        #s := SLPforElement(ri, x);
     od;
     # TODO: sort the factorMandarins and remove duplicates and trivials
 
@@ -570,7 +554,6 @@ InstallGlobalFunction( RecogniseGeneric,
         if counter > 10 then
             Info(InfoRecog,1,"Giving up desperately...");
             if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
-            # FIXME For debugging Error instead.
             return ri;
         fi;
 
@@ -584,14 +567,23 @@ InstallGlobalFunction( RecogniseGeneric,
         fi;
         if ForAny(GeneratorsOfGroup(H), x->not ValidateHomomInput(ri, x)) then
             # Our group fails to contain some of the generators of H!
-            return fail;
+            # We handle this in the same way as if a ValidateHomomInpu had
+            # returned fail for a mandarin.
+            return MANDARIN_CRISIS;
         fi;
 
         Add(depthString,'F');
         rifac := RecogniseGeneric(
                   Group(List(GeneratorsOfGroup(H), x->ImageElm(Homom(ri),x))),
-                  methodsforfactor(ri), depthString, forfactor(ri), factorMandarins ); # TODO: change forfactor to hintsForFactor??)
+                  methodsforfactor(ri), depthString, forfactor(ri),
+                  factorMandarins); # TODO: change forfactor to hintsForFactor?
         Remove(depthString);
+        # According to the mandarins, there was an error in a kernel generation
+        # higher up in the recognition tree. Since rifac was a factor node, it
+        # must have been `not safe`.
+        if rifac = MANDARIN_CRISIS then
+            return MANDARIN_CRISIS;
+        fi;
         PrintTreePos("F",depthString,H);
         SetRIFac(ri,rifac);
         SetRIParent(rifac,ri);
@@ -604,7 +596,11 @@ InstallGlobalFunction( RecogniseGeneric,
             Info(InfoRecog,2,"Back from factor (depth=",depth,").");
         fi;
 
+        # TODO: I think we should get rid of all the IsReady stuff. The
+        # manual says it's "mainly set for debugging purposes". Then why does
+        # it influence how often we try recognising the factor?
         if not IsReady(rifac) then
+            # FIXME: why should we give up here?
             # the recognition of the factor failed, also give up here:
             if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
             return ri;
@@ -615,6 +611,8 @@ InstallGlobalFunction( RecogniseGeneric,
         ri!.pregensfacwithmem := CalcNiceGens(rifac, ri!.gensHmem);
         Setpregensfac(ri, StripMemory(ri!.pregensfacwithmem));
 
+        # TODO: If mapping the mandarins failed, then we need to backtrack to
+        # the last safe node and then add more kernel generators here (I think).
         # Now create the kernel generators with the stored method:
         gensNmeth := findgensNmeth(ri);
         succ := CallFuncList(gensNmeth.method,
@@ -655,6 +653,8 @@ InstallGlobalFunction( RecogniseGeneric,
         x := mandarins[i];
         y := factorMandarins[i];
         s := SLPforElement(rifac, y);
+        # TODO: these SLPs should be stored when they are computed for the
+        # first time.
         if s = fail then
             Error("TODO: no SLP for factor");
         fi;
@@ -670,42 +670,21 @@ InstallGlobalFunction( RecogniseGeneric,
         # In this case we do nothing, kernel is fail indicating this.
 
         if Length(kernelMandarins) <> 0 then
-            # ooops, mandarins disagree
-            if gensNmeth.method = FindKernelDoNothing then
-                # TODO deal with this properly
-                Error("Mandarins detected bad kernel, but gensNmeth is FindKernelDoNothing");
-            elif IsBound(ri!.leavegensNuntouched) then
-                # TODO deal with this properly
-                Error("Mandarins detected bad kernel, but leavegensNuntouched is set");
-            else
-                # we need to 
-                # WARNING: do NOT add the mandarin here, even though it may seem tempting.
-                # But (a) they don't have memory, and (b) we need them to stay "clean",
-                # if we start using them for computations, this destroys our assumption
-                # about their independency
-                succ := FindKernelFastNormalClosure(ri,5,5);
-                Info(InfoRecog,2,"Have now ",Length(gensN(ri)),
-                     " generators for kernel, recognising...");
-                # TODO: we should check if we found non-trivial gens now, and also clean out
-                # duplicates etc.; possibly by replicating the code we use above
-                if succ = false then
-                    ErrorNoReturn("Very bad: factor was wrongly recognised and we ",
-                                  "found out too late");
-                fi;
-            fi;
-        else
-            Info(InfoRecog,2,"Found trivial kernel (depth=",depth,").");
-            SetRIKer(ri,fail);
-            # We have to learn from the factor, what our nice generators are:
-            SetNiceGens(ri,pregensfac(ri));
-            SetFilterObj(ri,IsReady);
-            if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
-            # StopStoringRandEls(ri);
-            return ri;
+            return MANDARIN_CRISIS;
         fi;
+        Info(InfoRecog,2,"Found trivial kernel (depth=",depth,").");
+        SetRIKer(ri,fail);
+        # We have to learn from the factor, what our nice generators are:
+        SetNiceGens(ri,pregensfac(ri));
+        SetFilterObj(ri,IsReady);
+        if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
+        # StopStoringRandEls(ri);
+        return ri;
     fi;
 
     Info(InfoRecog,2,"Going to the kernel (depth=",depth,").");
+    # If we do immediate verification, then we may have to recognise the kernel
+    # several times.
     repeat
         # Now we go on as usual:
         SetgensNslp(ri,SLPOfElms(gensN(ri)));
@@ -717,12 +696,22 @@ InstallGlobalFunction( RecogniseGeneric,
         Add(depthString,'K');
         riker := RecogniseGeneric( N, methoddb, depthString, forkernel(ri), kernelMandarins );
         Remove(depthString);
+        # According to the mandarins, there was an error in the kernel
+        # generation of the current node or higher up in the recognition tree.
+        # We have to backtrack to the highest unsafe node.
+        if riker = MANDARIN_CRISIS and not IsSafeRI(RIParent) then
+            return MANDARIN_CRISIS;
+        elif riker = MANDARIN_CRISIS and IsSafeRI(RIParent) then;
+            # b) we are the "highest" unsafe node. TODO:
+            #    - cut off the part of the tree rooted in the current node,
+            #    - add generators to the kernel
+            #    - restart the kernel recognition
+            ErrorNoReturn("TODO");
+        fi;
         PrintTreePos("K",depthString,H);
         SetRIKer(ri,riker);
         SetRIParent(riker,ri);
         Info(InfoRecog,2,"Back from kernel (depth=",depth,").");
-
-# TODO: verify kernelMandarins
 
         done := true;
         if IsReady(riker) and immediateverification(ri) then
@@ -753,11 +742,15 @@ InstallGlobalFunction( RecogniseGeneric,
                 Info(InfoRecog,2,"Have now ",Length(gensN(ri)),
                      " generators for kernel, recognising...");
                 if succ = false then
-                    ErrorNoReturn("Very bad: factor was wrongly recognised and we ",
-                                  "found out too late");
+                    return MANDARIN_CRISIS;
                 fi;
             fi;
         fi;
+        for x in kernelMandarins do
+            if SLPforElement(ri, x) = fail then
+                return MANDARIN_CRISIS;
+            fi;
+        od;
     until done;
 
     if IsReady(riker) then    # we are only ready when the kernel is
