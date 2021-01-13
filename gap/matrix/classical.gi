@@ -1721,16 +1721,29 @@ RECOG.NonGenericOrthogonalPlus := function(recognise,grp)
         ## 2.July.2019: There is a mistake in the paper here
         ## There are maximal subgroups of Omega+(8,5) that contain
         ## elements of order 7,13,3
-        if not HasElementsMultipleOf( recognise.orders, [7,13,3,312])  then
+        ## 13.Jan.2021: Added 31 and replaced 312 by 156. Elements with these
+        ## orders also exist in POmega+(8,5).
+        # TODO:
+        # - think again about why this distuinguishes (P)Omega+(8,5) from the
+        #   maximal subgroups of GO+.
+        # - write a comment that this works for projective and natural action.
+        # - do we need to use order(ri)(x) to get the projective orders?
+        # - how do we distinguish Omega+ and POmega+?
+        if not HasElementsMultipleOf( recognise.orders, [3,7,13,31,156])  then
             return fail;
         fi;
 
+        ## Such elements also exist in certain maximal subgroups of
+        ## Omega+(8,5). Thus we compute the projective action of grp on the
+        ## one-dimensional subspaces.
         pgrp := ProjectiveActionOnFullSpace( grp, recognise.field, d );
         orbs := Orbits( pgrp, MovedPointsPerms( GeneratorsOfGroup(pgrp)));
         if Set(orbs, Length) <> [ 19656, 39000 ] then
              recognise.isSOContained := false;
              return false;
         fi;
+        ## There are maximal subgroups that have the same orbit sizes as above.
+        ## So we need to compare the size of pgrp to the size of POmega(+1,8,5).
         if Size(pgrp) mod 8911539000000000000 = 0 then # compare to Size(POmega(+1,8,5))
              return CheckFlag();
         else
