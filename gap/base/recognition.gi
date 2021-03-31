@@ -425,9 +425,7 @@ InstallGlobalFunction( PrintTreePos,
   end );
 
 NUM_MANDARINS := 100;
-MANDARIN_CRISIS := "TODO";
 
-# TODO: documentation of mandarins.
 # Refer to overview paper by Baarnhielm, Holt, Charles, Eamonn, sections "5.2
 # The main algorithm" and "5.4 Crisis management".
 # Explain safe and unsafe nodes.

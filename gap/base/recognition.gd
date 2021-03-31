@@ -476,6 +476,9 @@ BindGlobal( "SLPforElementFuncsGeneric", rec() );
 
 DeclareGlobalFunction( "EmptyRecognitionInfoRecord" );
 
+# TODO Document mandarins
+BindGlobal("MANDARIN_CRISIS", MakeImmutable("MANDARIN_CRISIS"));
+
 ## <#GAPDoc Label="RecognisePermGroup">
 ## <ManSection>
 ## <Func Name="RecognisePermGroup" Arg="H"/>
