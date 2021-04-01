@@ -426,9 +426,6 @@ InstallGlobalFunction( PrintTreePos,
 
 NUM_MANDARINS := 100;
 
-# Refer to overview paper by Baarnhielm, Holt, Charles, Eamonn, sections "5.2
-# The main algorithm" and "5.4 Crisis management".
-# Explain safe and unsafe nodes.
 InstallGlobalFunction( RecogniseGeneric,
   function(H, methoddb, depthString, knowledge, mandarins)
     # Assume all the generators have no memory!
@@ -511,7 +508,6 @@ InstallGlobalFunction( RecogniseGeneric,
         for x in mandarins do
             s := SLPforElement(ri, x);
             if s = fail then
-                # TODO
                 return MANDARIN_CRISIS;
             fi;
         od;

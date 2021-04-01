@@ -477,6 +477,9 @@ BindGlobal( "SLPforElementFuncsGeneric", rec() );
 DeclareGlobalFunction( "EmptyRecognitionInfoRecord" );
 
 # TODO Document mandarins
+# Refer to overview paper by Baarnhielm, Holt, Charles, Eamonn, sections "5.2
+# The main algorithm" and "5.4 Crisis management".
+# Explain safe and unsafe nodes.
 BindGlobal("MANDARIN_CRISIS", MakeImmutable("MANDARIN_CRISIS"));
 
 ## <#GAPDoc Label="RecognisePermGroup">
