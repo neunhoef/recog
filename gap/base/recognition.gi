@@ -88,25 +88,25 @@ InstallMethod( ViewObj, "for recognition infos", [IsRecognitionInfo],
 
 InstallGlobalFunction( RecognisePermGroup,
   function(G)
-    return RecogniseGeneric(G, FindHomDbPerm, "", rec());
+    return RecogniseGeneric(G, FindHomDbPerm, "", rec(), fail);
   end);
 
 InstallGlobalFunction( RecogniseMatrixGroup,
   function(G)
-    return RecogniseGeneric(G, FindHomDbMatrix, "", rec());
+    return RecogniseGeneric(G, FindHomDbMatrix, "", rec(), fail);
   end);
 
 InstallGlobalFunction( RecogniseProjectiveGroup,
   function(G)
-    return RecogniseGeneric(G, FindHomDbProjective, "", rec());
+    return RecogniseGeneric(G, FindHomDbProjective, "", rec(), fail);
   end);
 
 InstallGlobalFunction( RecogniseGroup,
   function(G)
     if IsPermGroup(G) then
-        return RecogniseGeneric(G, FindHomDbPerm, "", rec());
+        return RecogniseGeneric(G, FindHomDbPerm, "", rec(), fail);
     elif IsMatrixGroup(G) then
-        return RecogniseGeneric(G, FindHomDbMatrix, "", rec());
+        return RecogniseGeneric(G, FindHomDbMatrix, "", rec(), fail);
     else
         ErrorNoReturn("Only matrix and permutation groups are supported");
     fi;
@@ -424,11 +424,14 @@ InstallGlobalFunction( PrintTreePos,
     fi;
   end );
 
+NUM_MANDARINS := 100;
+
 InstallGlobalFunction( RecogniseGeneric,
-  function(H, methoddb, depthString, knowledge)
+  function(H, methoddb, depthString, knowledge, mandarins)
     # Assume all the generators have no memory!
-    local N,depth,done,i,l,ll,gensNmeth,allmethods,
-          proj1,proj2,ri,rifac,riker,s,x,y,z,succ,counter;
+    local oldRandstore, N,depth,done,i,l,ll,gensNmeth,allmethods,
+          proj1,proj2,ri,rifac,riker,s,x,y,z,succ,counter,
+          mandarin,kernelMandarins,factorMandarins;
 
     depth := Length(depthString);
 
@@ -436,8 +439,19 @@ InstallGlobalFunction( RecogniseGeneric,
     Info(InfoRecog,4,"Recognising: ",H);
 
     if Length(GeneratorsOfGroup(H)) = 0 then
+        # FIXME: shouldn't we just, like, finish here immediately?
         H := Group([One(H)]);
     fi;
+
+    if mandarins = fail then
+        Assert(0, depth = 0);
+        # HACK: We don't want the mandarins to be reused by any computation.
+        # Since PseudoRandom is hacked, it is important that we generate the
+        # mandarins before calling EmptyRecognitionInfoRecord. Otherwise the
+        # mandarins would be reused by RandomElm and RandomElmOrd.
+        mandarins := List([1..NUM_MANDARINS], i -> PseudoRandom(H));
+    fi;
+
 
     # Set up the record and the group object:
     if IsIdenticalObj( methoddb, FindHomDbProjective ) then
@@ -488,6 +502,16 @@ InstallGlobalFunction( RecogniseGeneric,
                 SetNiceGens(ri,GeneratorsOfGroup(H));
             fi;
         fi;
+
+        # TODO: store the mandarins and their SLPs?
+        # check mandarins now
+        for x in mandarins do
+            s := SLPforElement(ri, x);
+            if s = fail then
+                return MANDARIN_CRISIS;
+            fi;
+        od;
+
         # these two were set correctly by FindHomomorphism
         if IsLeaf(ri) then SetFilterObj(ri,IsReady); fi;
         # FIXME: settle what IsReady means *exactly*;
@@ -501,6 +525,21 @@ InstallGlobalFunction( RecogniseGeneric,
 
     # The non-leaf case:
     # In that case we know that ri now knows: homom plus additional data.
+    
+    # Compute the mandarins of the factor
+    for x in mandarins do
+        if not ValidateHomomInput(ri, x) then
+            # TODO
+            return MANDARIN_CRISIS;
+        fi;
+    od;
+    factorMandarins := [];
+    for x in mandarins do
+        y := ImageElm(Homom(ri), x);
+        Assert(2, y <> fail);
+        Add(factorMandarins, y);
+    od;
+    # TODO: sort the factorMandarins and remove duplicates and trivials
 
     # Try to recognise the factor a few times, then give up:
     counter := 0;
@@ -522,14 +561,23 @@ InstallGlobalFunction( RecogniseGeneric,
         fi;
         if ForAny(GeneratorsOfGroup(H), x->not ValidateHomomInput(ri, x)) then
             # Our group fails to contain some of the generators of H!
-            return fail;
+            # We handle this in the same way as if a ValidateHomomInpu had
+            # returned fail for a mandarin.
+            return MANDARIN_CRISIS;
         fi;
 
         Add(depthString,'F');
         rifac := RecogniseGeneric(
                   Group(List(GeneratorsOfGroup(H), x->ImageElm(Homom(ri),x))),
-                  methodsforfactor(ri), depthString, forfactor(ri) ); # TODO: change forfactor to hintsForFactor??)
+                  methodsforfactor(ri), depthString, forfactor(ri),
+                  factorMandarins); # TODO: change forfactor to hintsForFactor?
         Remove(depthString);
+        # According to the mandarins, there was an error in a kernel generation
+        # higher up in the recognition tree. Since rifac was a factor node, it
+        # must have been `not safe`.
+        if rifac = MANDARIN_CRISIS then
+            return MANDARIN_CRISIS;
+        fi;
         PrintTreePos("F",depthString,H);
         SetRIFac(ri,rifac);
         SetRIParent(rifac,ri);
@@ -542,7 +590,11 @@ InstallGlobalFunction( RecogniseGeneric,
             Info(InfoRecog,2,"Back from factor (depth=",depth,").");
         fi;
 
+        # TODO: I think we should get rid of all the IsReady stuff. The
+        # manual says it's "mainly set for debugging purposes". Then why does
+        # it influence how often we try recognising the factor?
         if not IsReady(rifac) then
+            # FIXME: why should we give up here?
             # the recognition of the factor failed, also give up here:
             if InfoLevel(InfoRecog) = 1 and depth = 0 then Print("\n"); fi;
             return ri;
@@ -553,6 +605,8 @@ InstallGlobalFunction( RecogniseGeneric,
         ri!.pregensfacwithmem := CalcNiceGens(rifac, ri!.gensHmem);
         Setpregensfac(ri, StripMemory(ri!.pregensfacwithmem));
 
+        # TODO: If mapping the mandarins failed, then we need to backtrack to
+        # the last safe node and then add more kernel generators here (I think).
         # Now create the kernel generators with the stored method:
         gensNmeth := findgensNmeth(ri);
         succ := CallFuncList(gensNmeth.method,
@@ -570,7 +624,7 @@ InstallGlobalFunction( RecogniseGeneric,
         Sort(l,SortFunctionWithMemory);   # this favours "shorter" memories!
         # FIXME: For projective groups different matrices might stand
         #        for the same element, we might overlook this here!
-        # remove duplicates:
+        # remove duplicates and trivial entries:
         ll := [];
         for i in [1..Length(l)] do
             if not isone(ri)(l[i]) and
@@ -580,9 +634,38 @@ InstallGlobalFunction( RecogniseGeneric,
         od;
         SetgensN(ri,ll);
     fi;
+
+    # evaluate mandarins to get kernel mandarins
+    # TODO: something is suuper iffy about the method BlocksModScalars, which
+    # is called by BlockDiagonal.
+    # Apparently its input is neither to be understood as a projective nor as a
+    # matrix group, but rather as a "all block-scalars being trivial" group.
+    # That ofc completely wrecks the mandarins, since they assume the group to
+    # be projective.
+    kernelMandarins := [];
+    for i in [1..Length(mandarins)] do
+        x := mandarins[i];
+        y := factorMandarins[i];
+        s := SLPforElement(rifac, y);
+        # TODO: these SLPs should be stored when they are computed for the
+        # first time.
+        if s = fail then
+            Error("TODO: no SLP for factor");
+        fi;
+        z := ResultOfStraightLineProgram(s, pregensfac(ri));
+        if not ri!.isequal(x, z) then
+            Add( kernelMandarins, x / z );
+        fi;
+    od;
+    # TODO: sort the kernelMandarins and remove duplicates and trivials
+
     if Length(gensN(ri)) = 0 then
         # We found out that N is the trivial group!
         # In this case we do nothing, kernel is fail indicating this.
+
+        if Length(kernelMandarins) <> 0 then
+            return MANDARIN_CRISIS;
+        fi;
         Info(InfoRecog,2,"Found trivial kernel (depth=",depth,").");
         SetRIKer(ri,fail);
         # We have to learn from the factor, what our nice generators are:
@@ -594,6 +677,8 @@ InstallGlobalFunction( RecogniseGeneric,
     fi;
 
     Info(InfoRecog,2,"Going to the kernel (depth=",depth,").");
+    # If we do immediate verification, then we may have to recognise the kernel
+    # several times.
     repeat
         # Now we go on as usual:
         SetgensNslp(ri,SLPOfElms(gensN(ri)));
@@ -603,8 +688,20 @@ InstallGlobalFunction( RecogniseGeneric,
         N := Group(StripMemory(gensN(ri)));
 
         Add(depthString,'K');
-        riker := RecogniseGeneric( N, methoddb, depthString, forkernel(ri) );
+        riker := RecogniseGeneric( N, methoddb, depthString, forkernel(ri), kernelMandarins );
         Remove(depthString);
+        # According to the mandarins, there was an error in the kernel
+        # generation of the current node or higher up in the recognition tree.
+        # We have to backtrack to the highest unsafe node.
+        if riker = MANDARIN_CRISIS and not IsSafeRI(RIParent) then
+            return MANDARIN_CRISIS;
+        elif riker = MANDARIN_CRISIS and IsSafeRI(RIParent) then;
+            # b) we are the "highest" unsafe node. TODO:
+            #    - cut off the part of the tree rooted in the current node,
+            #    - add generators to the kernel
+            #    - restart the kernel recognition
+            ErrorNoReturn("TODO");
+        fi;
         PrintTreePos("K",depthString,H);
         SetRIKer(ri,riker);
         SetRIParent(riker,ri);
@@ -620,10 +717,6 @@ InstallGlobalFunction( RecogniseGeneric,
                 x := RandomElm(ri,"KERNELANDVERIFY",true).el;
                 Assert(2, ValidateHomomInput(ri, x));
                 s := SLPforElement(rifac,ImageElm( Homom(ri), x!.el ));
-                if s = fail then
-                    ErrorNoReturn("Very bad: factor was wrongly recognised and we ",
-                                  "found out too late");
-                fi;
                 y := ResultOfStraightLineProgram(s, ri!.pregensfacwithmem);
                 z := x*y^-1;
                 s := SLPforElement(riker,z!.el);
@@ -643,11 +736,15 @@ InstallGlobalFunction( RecogniseGeneric,
                 Info(InfoRecog,2,"Have now ",Length(gensN(ri)),
                      " generators for kernel, recognising...");
                 if succ = false then
-                    ErrorNoReturn("Very bad: factor was wrongly recognised and we ",
-                                  "found out too late");
+                    return MANDARIN_CRISIS;
                 fi;
             fi;
         fi;
+        for x in kernelMandarins do
+            if SLPforElement(ri, x) = fail then
+                return MANDARIN_CRISIS;
+            fi;
+        od;
     until done;
 
     if IsReady(riker) then    # we are only ready when the kernel is
@@ -969,6 +1066,9 @@ InstallGlobalFunction( "SLPforNiceGens", function(ri)
   return s;
 end );
 
+# For user debugging purposes. Takes a string consisting of lower- or
+# upper-case "f" and "k". Returns the node one arrives at by descending through
+# the tree, going to the factor for each "f" and to the kernel for each "k".
 InstallGlobalFunction( "GetCompositionTreeNode",
   function( ri, what )
     local r,c;
@@ -1165,43 +1265,4 @@ RECOG.testAllSubgroups := function(g, options...)
     for sub in list do
         CallFuncList(RECOG.TestGroup, Concatenation([sub, false, Size(sub)],options));
     od;
-end;
-
-
-RECOG.TestRecognitionNode := function(ri,stop,recurse)
-  local err, grp, x, slp, y, ef, ek, i;
-  err := 0;
-  grp := Grp(ri);
-  for i in [1..100] do
-      x := PseudoRandom(grp);
-      slp := SLPforElement(ri,x);
-      if slp <> fail then
-          y := ResultOfStraightLineProgram(slp,NiceGens(ri));
-      fi;
-      if slp = fail or not ri!.isone(x/y) then
-          if stop then ErrorNoReturn("ErrorNoReturn found, look at x, slp and y"); fi;
-          err := err + 1;
-          Print("X\c");
-      else
-          Print(".\c");
-      fi;
-  od;
-  Print("\n");
-  if err > 0 and recurse then
-      if IsLeaf(ri) then
-          return rec(err := err, badnode := ri);
-      fi;
-      ef := RECOG.TestRecognitionNode(RIFac(ri),stop,recurse);
-      if IsRecord(ef) then
-          return ef;
-      fi;
-      if RIKer(ri) <> fail then
-          ek := RECOG.TestRecognitionNode(RIKer(ri),stop,recurse);
-          if IsRecord(ek) then
-              return ek;
-          fi;
-      fi;
-      return rec( err := err, badnode := ri, factorkernelok := true );
-  fi;
-  return err;
 end;
