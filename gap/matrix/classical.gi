@@ -2406,6 +2406,12 @@ function( arg )
                    p := Characteristic(f),
                    a := DegreeOverPrimeField(f),
                    q := Characteristic(f)^DegreeOverPrimeField(f),
+                   # TODO:
+                   # n -> recognise.nrRandomElms
+                   # LE = e's of large ppd elements
+                   # BE = e's of basic ppd elements
+                   # LB = e's of large basic ppd elements
+                   # E2 = ?
                    E := [], LE := [], BE := [], LB := [],
                    LS := [], E2 := [], LE2 := [], BE2 := [],
                    g := fail,
