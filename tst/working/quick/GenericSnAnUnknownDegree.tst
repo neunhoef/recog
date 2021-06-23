@@ -79,7 +79,7 @@ gap> IsBolsteringElement :=
 # For each entry (d, k) we construct Sym(d)/Alt(d) acting on k-sets.
 # For each entry (d, k), we must have 2 * k ^ 2 > d,
 # otherwise LargeBasePrimitive recognises the group instead of SnAnUnknownDegree.
-gap> data := [[11, 3], [12, 3], [13, 3]];;
+gap> data := [[9, 3], [10, 3], [11, 3], [12, 3], [13, 3]];;
 
 # TODO: more non-isomorphic examples
 # TODO: add projective groups
