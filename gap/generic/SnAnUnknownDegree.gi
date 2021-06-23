@@ -41,6 +41,27 @@ RECOG.ThreeCycleCandidatesConstants := function(eps, N)
     );
 end;
 
+# Return false if c can not be a three cycle. This uses cheap tests to
+# determine this. It is based on the Magma function heuristicThreeCycleTest.
+heuristicThreeCycleTest := function(ri, c, logInt2N)
+    local r, y, yTo5, k;
+    c := StripMemory(c);
+    if not isone(ri)(c ^ 3) then
+        return false;
+    fi;
+    for k in [1 .. logInt2N + 1] do
+        r := StripMemory(PseudoRandom(Grp(ri)));
+        # c * c ^ r is a product of two three-cycles, so it should have order
+        # 1, 2, 3 or 5.
+        y := c * c ^ r;
+        yTo5 := y ^ 5;
+        if not isone(ri)(yTo5) and not isone(ri)(yTo5 * y) then
+            return false;
+        fi;
+    od;
+    return true;
+end;
+
 # ri : recognition node with group G
 # constants : a record with components M, B, T, C, and logInt2N
 #
@@ -97,7 +118,9 @@ RECOG.ThreeCycleCandidatesIterator := function(ri, constants)
             # integer, loop variable
             a,
             # elements, in G
-            r, tPower, tPowerOld, c;
+            r, tPower, tPowerOld, c,
+            # the three cycle candidate
+            candidate;
         # Steps 2 & 3: New involution
         # Check if we either tried enough conjugates or constructed enough
         # three cycle candidates for the current involution t.
@@ -130,11 +153,18 @@ RECOG.ThreeCycleCandidatesIterator := function(ri, constants)
         # the comment above this function.
         nrTriedConjugates := nrTriedConjugates + 1;
         c := t ^ RandomElm(ri, "SnAnUnknownDegree", true)!.el;
-        if not isequal(ri)(t * c, c * t) then
-            nrThreeCycleCandidates := nrThreeCycleCandidates + 1;
-            return (t * c) ^ 2;
-        else
+        if isequal(ri)(t * c, c * t) then
             # we have to call tryThreeCycleCandidate again
+            return fail;
+        fi;
+        candidate := (t * c) ^ 2;
+        # We now use a one-sided heuristic to test whether candidate can be a
+        # three cycle, that is the heuristic can detect whether candidate can
+        # not be a three cycle, e.g. if it does not have order three.
+        nrThreeCycleCandidates := nrThreeCycleCandidates + 1;
+        if heuristicThreeCycleTest(ri, candidate, logInt2N) then
+            return candidate;
+        else
             return fail;
         fi;
     end;
@@ -865,12 +895,6 @@ RECOG.RecogniseSnAn := function(ri, eps, N)
         c := iterator();
         while c <> fail do
             if c = NeverApplicable then return NeverApplicable; fi;
-            # This is a very cheap test to determine
-            # if our candidate c could be a three cycle.
-            if not isone(ri)(StripMemory(c) ^ 3) then
-                c := iterator();
-                continue;
-            fi;
             tmp := RECOG.ConstructLongCycle(ri, c, 1. / 8., N);
             if tmp = fail then
                 c := iterator();
