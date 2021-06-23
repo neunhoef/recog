@@ -104,8 +104,9 @@ RECOG.ThreeCycleCandidatesIterator := function(ri, constants)
         # If this is the case, we need to construct the next involution
         if nrTriedConjugates >= C or nrThreeCycleCandidates >= T then
             r := RandomElm(ri, "SnAnUnknownDegree", true)!.el;
-            tPower := r ^ M;
+            # In the paper, we have t = r ^ M.
             # Invariant: tPower = (r ^ M) ^ (2 ^ a)
+            tPower := r ^ M;
             # We make a small improvement to the version described in
             # <Cite Key="JLNP13"/>. The order of r ^ M is a 2-power.
             # It can be at most 2 ^ logInt2N. Thus, if we find an r such that
