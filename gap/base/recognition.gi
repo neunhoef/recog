@@ -213,14 +213,18 @@ RECOG.SetPseudoRandomStamp := function(g,st)
   fi;
 end;
 
-# RandomElm and RandomElmOrd take a recog record, a string, and a
-# bool as inputs.
-# The string is used as a stamp to request a random element or order for a
-# specific computation. RandomElm and RandomElmOrd will first try to reuse
+# RandomElm(ri, stamp, mem), RandomOrder(..), and RandomElmOrd(..) return, and
+# possibly cache in the recog node `ri`, a random element, order of a random
+# element or both, respectively.
+# The string `stamp` is used as a stamp to request a random element and/or
+# order for a specific computation. The functions will first try to reuse
 # random elements and orders generated with different stamps.
 # For example, if a computation which used stamp := "A" has already computed
 # random elements or orders, then RandomElm and RandomElmOrd will reuse these
 # if called with stamp := "B".
+# The boolean `mem` states whether the returned element should be in
+# IsObjWithMemory. If it is cached, then cached version of the element always
+# is in IsObjWithMemory.
 #
 # The components of the recog record involved are explained in
 # EmptyRecognitionInfoRecord.
@@ -285,6 +289,14 @@ InstallMethod( RandomElmOrd,
         res.el := res.el!.el;
     fi;
     return res;
+  end );
+
+# For an explanation see RandomElm.
+InstallMethod( RandomOrder,
+  "for a recognition node, a string and a bool",
+  [ IsRecogNode, IsString, IsBool ],
+  function(ri, stamp, mem)
+    return RandomElmOrd(ri, stamp, mem).order;
   end );
 
 # GetElmOrd takes a recognition node and a record r. The record r

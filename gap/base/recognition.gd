@@ -615,6 +615,7 @@ DeclareGlobalFunction( "SLPforElementGeneric" );
 DeclareGlobalFunction( "SLPforElement" );
 DeclareOperation( "RandomElm", [ IsRecogNode, IsString, IsBool ] );
 DeclareOperation( "RandomElmOrd", [ IsRecogNode, IsString, IsBool ] );
+DeclareOperation( "RandomOrder", [ IsRecogNode, IsString, IsBool ] );
 DeclareOperation( "RandomElmPpd", [ IsRecogNode, IsString, IsBool ] );
 DeclareOperation( "RandomOrdersSeen", [ IsRecogNode ] );
 DeclareOperation( "StopStoringRandEls", [ IsRecogNode ] );
