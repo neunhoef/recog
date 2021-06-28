@@ -18,6 +18,7 @@
 
 DeclareGlobalFunction( "RandomSubproduct" );
 DeclareGlobalFunction( "FastNormalClosure" );
+DeclareGlobalFunction( "ImmediateVerification" );
 DeclareGlobalFunction( "FindKernelFastNormalClosure" );
 DeclareGlobalFunction( "FindKernelRandom" );
 DeclareGlobalFunction( "FindKernelDoNothing" );

@@ -16,29 +16,98 @@
 ##
 #############################################################################
 
-InstallGlobalFunction( FindKernelRandom,
-  function(ri,n)
-    local i,l,rifac,s,x,y;
-    Info(InfoRecog,2,"Creating ",n," random generators for kernel.");
-    l := gensN(ri);
-    rifac := ImageRecogNode(ri);
-    for i in [1..n] do
-        x := RandomElm(ri,"KERNELANDVERIFY",true).el;
+# Helper function for FindKernelRandom and RecogniseGeneric.
+# Generate `n` random kernel elements for `ri` and return a boolean. If
+# `onlyGenerate` is true, then add the kernel elements directly to `gensN(ri)`.
+# Otherwise, ask the kernel node to write the random kernel elements as SLPs in
+# the kernel node's nice generators.
+# The return value is `fail`, iff computing an SLP for a random element of the
+# group behind the image node of `ri` failed. This indicates, that something
+# went wrong during recognition of the image.
+# If the return value is not `fail`, then it is `false` if for any random kernel
+# element it was not possible to write it as an SLP in the kernel node's nice
+# generators. Otherwise it is `true`. Hence, the return value can only be
+# `false`, if `onlyGenerate` is `false`.
+BindGlobal( "GenerateRandomKernelElementsAndOptionallyVerifyThem",
+  function(ri, n, onlyGenerate)
+    local gens, verificationSuccess, x, s, y, z, i;
+    gens := gensN(ri);
+    verificationSuccess := true;
+    # We generate a random element of the kernel as the quotient of a random
+    # element and the preimage of its image under the homomorphism.
+    for i in [1 .. n] do
+        # Finding kernel generators and immediate verification must use
+        # different random elements! This is ensured by using the same stamp
+        # in both situations.
+        x := RandomElm(ri, "GenerateRandomKernelElementsAndOptionallyVerifyThem", true).el;
         Assert(2, ValidateHomomInput(ri, x));
-        s := SLPforElement(rifac,ImageElm( Homom(ri), x!.el ));
+        s := SLPforElement(ImageRecogNode(ri),
+                                 ImageElm(Homom(ri), x!.el));
         if s = fail then
-            return false;
+            return fail;
         fi;
         y := ResultOfStraightLineProgram(s, ri!.pregensfacwithmem);
-        Add(l,x^-1*y);
-        if InfoLevel(InfoRecog) >= 2 then
-            Print(".\c");
+        z := x^-1*y;
+        if isone(ri)(z) or ForAny(gens, x -> isequal(ri)(x, z)) then
+            continue;
+        fi;
+        if onlyGenerate or SLPforElement(KernelRecogNode(ri), z!.el) = fail then
+            Add(gens, z);
+            verificationSuccess := false;
         fi;
     od;
-    if InfoLevel(InfoRecog) >= 2 then
-        Print("\n");
+    return verificationSuccess;
+  end );
+
+InstallGlobalFunction( ImmediateVerification,
+  function(ri)
+    local verified;
+    verified := GenerateRandomKernelElementsAndOptionallyVerifyThem(
+        ri,
+        RECOG_NrElementsInImmediateVerification,
+        false
+    );
+    if verified = fail then
+        ErrorNoReturn("Very bad: image was wrongly recognised ",
+                      "and  we found out too late");
     fi;
-    return true;
+    if verified = true then return true; fi;
+    # Now, verified = false.
+    Info(InfoRecog,2,
+         "Immediate verification: found extra kernel element(s)!");
+    if FindKernelFastNormalClosure(ri,5,5) = fail then
+        ErrorNoReturn("Very bad: image was wrongly recognised ",
+                      "and  we found out too late");
+    fi;
+    Info(InfoRecog,2,"Have now ",Length(gensN(ri)),
+         " generators for kernel.");
+    return false;
+  end );
+
+InstallGlobalFunction( FindKernelRandom,
+  function(ri,n)
+    local res;
+    Info(InfoRecog,2,"Creating ",n," random generators for kernel.");
+    # We need to be careful with creating trivial kernels because we may want
+    # to do immediate verification. If we find only trivial generators for the
+    # kernel, then the kernel node of `ri` is set to `fail`. However, then
+    # doing immediate verification would become a bit complicated. On the other
+    # hand, creating a kernel node with only a trivial generator breaks all
+    # kinds of other functions. So instead, when we find only trivial
+    # generators we generate more random kernel elements. This is equivalent
+    # to doing one immediate verification.
+    res := GenerateRandomKernelElementsAndOptionallyVerifyThem(ri, n, true);
+    if res = fail then return fail; fi;
+    if IsEmpty(gensN(ri)) and immediateverification(ri) then
+        Info(InfoRecog,2,"Found only trivial generators for the kernel. ",
+             "Doing immediate verification.");
+        res := GenerateRandomKernelElementsAndOptionallyVerifyThem(
+            ri,
+            RECOG_NrElementsInImmediateVerification,
+            true
+        );
+    fi;
+    return res;
   end );
 
 InstallGlobalFunction( FindKernelDoNothing,
@@ -114,8 +183,8 @@ end );
 InstallGlobalFunction( FindKernelFastNormalClosure,
   # Used in the generic recursive routine.
   function(ri,n1,n2)
-    if not FindKernelRandom(ri, n1) then
-        return false;
+    if FindKernelRandom(ri, n1) = fail then
+        return fail;
     fi;
 
     SetgensN(ri,FastNormalClosure(ri!.gensHmem,gensN(ri),n2));
