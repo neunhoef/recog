@@ -147,9 +147,9 @@ InstallGlobalFunction( EmptyRecognitionInfoRecord,
     Setslpforelement(ri,SLPforElementGeneric);
     SetgensN(ri,[]);       # this will grow over time
     Setimmediateverification(ri,false);
-    Setforkernel(ri,rec(hints := []));
+    SetInitDataForKernelRecogNode(ri,rec(hints := []));
           # this is eventually handed down to the kernel
-    Setforfactor(ri,rec(hints := []));
+    SetInitDataForImageRecogNode(ri,rec(hints := []));
           # this is eventually handed down to the image
     if projective then
         Setisone(ri,IsOneProjective);
@@ -447,7 +447,7 @@ InstallGlobalFunction( RecogniseGeneric,
         ri := EmptyRecognitionInfoRecord(knowledge,H,false);
     fi;
     # was here earlier: Setcalcnicegens(ri,CalcNiceGensGeneric);
-    Setmethodsforfactor(ri,methoddb);
+    Setmethodsforimage(ri,methoddb);
 
     # Find a possible homomorphism (or recognise this group as leaf)
     allmethods := methoddb;
@@ -533,11 +533,11 @@ InstallGlobalFunction( RecogniseGeneric,
         Add(depthString,'F');
         rifac := RecogniseGeneric(
                   Group(List(GeneratorsOfGroup(H), x->ImageElm(Homom(ri),x))),
-                  methodsforfactor(ri), depthString, forfactor(ri) ); # TODO: change forfactor to hintsForFactor??)
+                  methodsforimage(ri), depthString, InitDataForImageRecogNode(ri) ); # TODO: change InitDataForImageRecogNode to hintsForFactor??)
         Remove(depthString);
         PrintTreePos("F",depthString,H);
         SetImageRecogNode(ri,rifac);
-        SetRIParent(rifac,ri);
+        SetParentRecogNode(rifac,ri);
 
         if IsMatrixGroup(H) then
             Info(InfoRecog,2,"Back from image (depth=",depth,
@@ -607,11 +607,11 @@ InstallGlobalFunction( RecogniseGeneric,
         N := Group(StripMemory(gensN(ri)));
 
         Add(depthString,'K');
-        riker := RecogniseGeneric( N, methoddb, depthString, forkernel(ri) );
+        riker := RecogniseGeneric( N, methoddb, depthString, InitDataForKernelRecogNode(ri) );
         Remove(depthString);
         PrintTreePos("K",depthString,H);
         SetKernelRecogNode(ri,riker);
-        SetRIParent(riker,ri);
+        SetParentRecogNode(riker,ri);
         Info(InfoRecog,2,"Back from kernel (depth=",depth,").");
 
         done := true;

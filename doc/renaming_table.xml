@@ -1,5 +1,5 @@
 <Table Align="|l|l|">
-<Caption> Renaming</Caption>
+<Caption>Renaming</Caption>
 <HorLine/>
 <Row>
 	<Item> <E>Old Name</E> </Item>
@@ -24,6 +24,26 @@
 <Row>
 	<Item> <C>RIKer</C> </Item>
 	<Item> <Ref Attr="KernelRecogNode"/> </Item>
+</Row>
+<HorLine/>
+<Row>
+	<Item> <C>RIParent</C> </Item>
+	<Item> <Ref Attr="ParentRecogNode"/> </Item>
+</Row>
+<HorLine/>
+<Row>
+	<Item> <C>methodsforfactor</C> </Item>
+	<Item> <Ref Attr="methodsforimage"/> </Item>
+</Row>
+<HorLine/>
+<Row>
+	<Item> <C>forfactor</C> </Item>
+	<Item> <Ref Attr="InitDataForImageRecogNode"/> </Item>
+</Row>
+<HorLine/>
+<Row>
+	<Item> <C>forkernel</C> </Item>
+	<Item> <Ref Attr="InitDataForKernelRecogNode"/> </Item>
 </Row>
 <HorLine/>
 </Table>
