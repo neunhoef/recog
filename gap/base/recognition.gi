@@ -127,7 +127,6 @@ InstallGlobalFunction( TryFindHomMethod,
   function( g, method, projective )
     local result,ri;
     ri := EmptyRecognitionInfoRecord(rec(),g,projective);
-    Unbind(g!.pseudorandomfunc);
     result := method(ri,g);
     if result in [TemporaryFailure, NeverApplicable] then
         return result;
@@ -199,17 +198,30 @@ InstallGlobalFunction( EmptyRecognitionInfoRecord,
     # randp and randppt were used to store ppd elements. Currently unused.
     #ri!.randp := EmptyPlist(100);
     #ri!.randppt := rec();
-    H!.pseudorandomfunc := [rec(func := function(ri,name,bool)
+    SetPseudoRandomFunctionAndArguments(H,
+                                        rec(func := function(ri,name,bool)
                                           return RandomElm(ri,name,bool).el;
                                         end,
-                                args := [ri,"PseudoRandom",false])];
+                                        args := [ri,"PseudoRandom",false]));
     return ri;
+  end );
+
+InstallMethod( PseudoRandom, "for a group with special pseudo random function",
+  [ IsGroup and HasPseudoRandomFunctionAndArguments ], 1,
+  function( g )
+    local r;
+    # FIXME: get rid of this hackish override of PseudoRandom,
+    # and define our own operation instead (say, RECOG_PseudoRandom)?!
+    r := PseudoRandomFunctionAndArguments(g);
+    return CallFuncList(r.func,
+                        r.args);
   end );
 
 # Sets the stamp used by RandomElm, RandomElmOrd, and related functions.
 RECOG.SetPseudoRandomStamp := function(g,st)
-  if IsBound(g!.pseudorandomfunc) then
-      g!.pseudorandomfunc[Length(g!.pseudorandomfunc)].args[2] := st;
+  local list;
+  if HasPseudoRandomFunctionAndArguments(g) then
+      PseudoRandomFunctionAndArguments(g).args[2] := st;
   fi;
 end;
 
@@ -229,10 +241,10 @@ end;
 # The components of the recog record involved are explained in
 # EmptyRecognitionInfoRecord.
 #
-# HACK: For recog records created by EmptyRecognitionInfoRecord the method
-# RandomElm is by default stored in the component ri!.Grp!.pseudorandomfunc.
-# A method for PseudoRandom is installed such that it calls
-# RandomElm(ri, "PseudoRandom", false).
+# HACK: For recog nodes created by EmptyRecognitionInfoRecord the method
+# RandomElm is by default stored in the attribute
+# PseudoRandomFunctionAndArguments, which in turn is used by a method installed
+# for PseudoRandom.
 InstallMethod( RandomElm, "for a recognition node, a string and a bool",
   [ IsRecogNode, IsString, IsBool ],
   function(ri, stamp, mem)
