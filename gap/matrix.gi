@@ -816,6 +816,9 @@ function(ri,G)
   SetHomom(ri,hom);
   # Now give hints downward:
   Setmethodsforfactor(ri,FindHomDbProjective);
+  # Make sure that immediate verification is performed to safeguard against the
+  # kernel being too small.
+  Setimmediateverification(ri, true);
   # note that RecogniseGeneric detects the use of FindHomDbProjective and
   # sets ri!.projective := true for the image
   # the kernel:
