@@ -647,7 +647,7 @@ InstallGlobalFunction( RecogniseGeneric,
         if IsReady(riker) and immediateverification(ri) then
             # Do an immediate verification:
             Info(InfoRecog,2,"Doing immediate verification.");
-            for i in [1..5] do
+            for i in [1..10] do
                 # We must use different random elements than the kernel
                 # finding routines!
                 x := RandomElm(ri,"KERNELANDVERIFY",true).el;
