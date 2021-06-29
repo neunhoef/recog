@@ -195,7 +195,7 @@ InstallGlobalFunction( EmptyRecognitionInfoRecord,
     # randopt stores for each stamp how often it was used to generate a random
     # order.
     ri!.randopt := rec();
-    ri!.randstore := true;  # TODO: try what happens if we change this to false in terms of performance
+    ri!.randstore := true;
     # randp and randppt were used to store ppd elements. Currently unused.
     #ri!.randp := EmptyPlist(100);
     #ri!.randppt := rec();
@@ -232,7 +232,7 @@ end;
 InstallMethod( RandomElm, "for a recognition node, a string and a bool",
   [ IsRecogNode, IsString, IsBool ],
   function(ri, stamp, mem)
-    local pos,el;
+    local pos, el, res;
     if ri!.randstore then
         if IsBound(ri!.randrpt.(stamp)) then
             ri!.randrpt.(stamp) := ri!.randrpt.(stamp) + 1;
@@ -247,11 +247,16 @@ InstallMethod( RandomElm, "for a recognition node, a string and a bool",
     else
         el := Next(ri!.prodrep);
     fi;
+    res := rec();
     if mem then
-        return rec( el := el, nr := pos );
+        res.el := el;
     else
-        return rec( el := el!.el, nr := pos );
+        res.el := el!.el;
     fi;
+    if ri!.randstore then
+        res.nr := pos;
+    fi;
+    return res;
   end );
 
 # For an explanation see RandomElm.
