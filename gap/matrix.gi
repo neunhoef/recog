@@ -552,6 +552,7 @@ function(ri,G)
       AddMethod(forkernel(ri).hints, FindHomMethodsMatrix.BlockScalar, 2000);
   fi;
   forkernel(ri).blocks := ri!.blocks;
+  Setimmediateverification(ri, true);
   return Success;
 end);
 
