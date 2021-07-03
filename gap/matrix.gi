@@ -539,8 +539,9 @@ function(ri,G)
   Setmethodsforfactor(ri,FindHomDbProjective);
 
   # the kernel:
+  # The kernel is abelian, so we don't need to do normal closures.
+  findgensNmeth(ri).func := FindKernelRandom;
   findgensNmeth(ri).args[1] := Length(ri!.blocks)+10;
-  findgensNmeth(ri).args[2] := 7;
   # In the projective case we have to do a trick: We use an isomorphism
   # to a matrix group by multiplying things such that the last block
   # becomes an identity matrix:
