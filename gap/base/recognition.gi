@@ -16,6 +16,7 @@
 ##
 #############################################################################
 
+BindConstant("RECOG_NrElementsInImmediateVerification", 10);
 
 # a nice view method:
 RECOG_ViewObj := function( level, ri )
@@ -127,7 +128,6 @@ InstallGlobalFunction( TryFindHomMethod,
   function( g, method, projective )
     local result,ri;
     ri := EmptyRecognitionInfoRecord(rec(),g,projective);
-    Unbind(g!.pseudorandomfunc);
     result := method(ri,g);
     if result in [TemporaryFailure, NeverApplicable] then
         return result;
@@ -199,40 +199,57 @@ InstallGlobalFunction( EmptyRecognitionInfoRecord,
     # randp and randppt were used to store ppd elements. Currently unused.
     #ri!.randp := EmptyPlist(100);
     #ri!.randppt := rec();
-    H!.pseudorandomfunc := [rec(func := function(ri,name,bool)
+    SetPseudoRandomFunctionAndArguments(H,
+                                        rec(func := function(ri,name,bool)
                                           return RandomElm(ri,name,bool).el;
                                         end,
-                                args := [ri,"PseudoRandom",false])];
+                                        args := [ri,"PseudoRandom",false]));
     return ri;
+  end );
+
+InstallMethod( PseudoRandom, "for a group with special pseudo random function",
+  [ IsGroup and HasPseudoRandomFunctionAndArguments ], 1,
+  function( g )
+    local r;
+    # FIXME: get rid of this hackish override of PseudoRandom,
+    # and define our own operation instead (say, RECOG_PseudoRandom)?!
+    r := PseudoRandomFunctionAndArguments(g);
+    return CallFuncList(r.func,
+                        r.args);
   end );
 
 # Sets the stamp used by RandomElm, RandomElmOrd, and related functions.
 RECOG.SetPseudoRandomStamp := function(g,st)
-  if IsBound(g!.pseudorandomfunc) then
-      g!.pseudorandomfunc[Length(g!.pseudorandomfunc)].args[2] := st;
+  local list;
+  if HasPseudoRandomFunctionAndArguments(g) then
+      PseudoRandomFunctionAndArguments(g).args[2] := st;
   fi;
 end;
 
-# RandomElm and RandomElmOrd take a recog record, a string, and a
-# bool as inputs.
-# The string is used as a stamp to request a random element or order for a
-# specific computation. RandomElm and RandomElmOrd will first try to reuse
+# RandomElm(ri, stamp, mem), RandomOrder(..), and RandomElmOrd(..) return, and
+# possibly cache in the recog node `ri`, a random element, order of a random
+# element or both, respectively.
+# The string `stamp` is used as a stamp to request a random element and/or
+# order for a specific computation. The functions will first try to reuse
 # random elements and orders generated with different stamps.
 # For example, if a computation which used stamp := "A" has already computed
 # random elements or orders, then RandomElm and RandomElmOrd will reuse these
 # if called with stamp := "B".
+# The boolean `mem` states whether the returned element should be in
+# IsObjWithMemory. If it is cached, then cached version of the element always
+# is in IsObjWithMemory.
 #
 # The components of the recog record involved are explained in
 # EmptyRecognitionInfoRecord.
 #
-# HACK: For recog records created by EmptyRecognitionInfoRecord the method
-# RandomElm is by default stored in the component ri!.Grp!.pseudorandomfunc.
-# A method for PseudoRandom is installed such that it calls
-# RandomElm(ri, "PseudoRandom", false).
+# HACK: For recog nodes created by EmptyRecognitionInfoRecord the method
+# RandomElm is by default stored in the attribute
+# PseudoRandomFunctionAndArguments, which in turn is used by a method installed
+# for PseudoRandom.
 InstallMethod( RandomElm, "for a recognition node, a string and a bool",
   [ IsRecogNode, IsString, IsBool ],
   function(ri, stamp, mem)
-    local pos,el;
+    local pos, el, res;
     if ri!.randstore then
         if IsBound(ri!.randrpt.(stamp)) then
             ri!.randrpt.(stamp) := ri!.randrpt.(stamp) + 1;
@@ -247,11 +264,16 @@ InstallMethod( RandomElm, "for a recognition node, a string and a bool",
     else
         el := Next(ri!.prodrep);
     fi;
+    res := rec();
     if mem then
-        return rec( el := el, nr := pos );
+        res.el := el;
     else
-        return rec( el := el!.el, nr := pos );
+        res.el := el!.el;
     fi;
+    if ri!.randstore then
+        res.nr := pos;
+    fi;
+    return res;
   end );
 
 # For an explanation see RandomElm.
@@ -285,6 +307,14 @@ InstallMethod( RandomElmOrd,
         res.el := res.el!.el;
     fi;
     return res;
+  end );
+
+# For an explanation see RandomElm.
+InstallMethod( RandomOrder,
+  "for a recognition node, a string and a bool",
+  [ IsRecogNode, IsString, IsBool ],
+  function(ri, stamp, mem)
+    return RandomElmOrd(ri, stamp, mem).order;
   end );
 
 # GetElmOrd takes a recognition node and a record r. The record r
@@ -561,7 +591,7 @@ InstallGlobalFunction( RecogniseGeneric,
         # Now create the kernel generators with the stored method:
         succ := CallFuncList(findgensNmeth(ri).method,
                              Concatenation([ri],findgensNmeth(ri).args));
-    until succ;
+    until succ = true;
 
     # If nobody has set how we produce preimages of the nicegens:
     if not Hascalcnicegens(ri) then
@@ -616,41 +646,9 @@ InstallGlobalFunction( RecogniseGeneric,
 
         done := true;
         if IsReady(riker) and immediateverification(ri) then
-            # Do an immediate verification:
-            Info(InfoRecog,2,"Doing immediate verification.");
-            for i in [1..5] do
-                # We must use different random elements than the kernel
-                # finding routines!
-                x := RandomElm(ri,"KERNELANDVERIFY",true).el;
-                Assert(2, ValidateHomomInput(ri, x));
-                s := SLPforElement(rifac,ImageElm( Homom(ri), x!.el ));
-                if s = fail then
-                    ErrorNoReturn("Very bad: image was wrongly recognised and we ",
-                                  "found out too late");
-                fi;
-                y := ResultOfStraightLineProgram(s, ri!.pregensfacwithmem);
-                z := x*y^-1;
-                s := SLPforElement(riker,z!.el);
-                if InfoLevel(InfoRecog) >= 2 then Print(".\c"); fi;
-                if s = fail then
-                    # We missed something!
-                    done := false;
-                    Add(gensN(ri),z);
-                    Info(InfoRecog,2,
-                         "Alarm: Found unexpected kernel element! (depth=",
-                         depth,")");
-                fi;
-            od;
-            if InfoLevel(InfoRecog) >= 2 then Print("\n"); fi;
-            if not done then
-                succ := FindKernelFastNormalClosure(ri,5,5);
-                Info(InfoRecog,2,"Have now ",Length(gensN(ri)),
-                     " generators for kernel, recognising...");
-                if succ = false then
-                    ErrorNoReturn("Very bad: image was wrongly recognised and we ",
-                                  "found out too late");
-                fi;
-            fi;
+            Info(InfoRecog,2,"Doing immediate verification (depth=",
+                 depth,").");
+            done := ImmediateVerification(ri);
         fi;
     until done;
 

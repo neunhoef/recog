@@ -68,6 +68,9 @@ function(ri, G)
     # store the homomorphism into the recognition node
     SetHomom(ri,hom);
 
+    # TODO: explanation
+    Setimmediateverification(ri, true);
+
     # indicate success
     return Success;
 end);
@@ -275,9 +278,9 @@ rec(validatesOrAlwaysValidInput := true),
 function(ri, G)
   local Gm,S;
   Gm := Group(ri!.gensHmem);
-  Gm!.pseudorandomfunc := [rec(
+  SetPseudoRandomFunctionAndArguments(Gm, rec(
      func := function(ri) return RandomElm(ri,"StabilizerChainPerm",true).el; end,
-     args := [ri])];
+     args := [ri]));
   S := StabilizerChain(Gm);
   SetSize(ri,Size(S));
   SetSize(Grp(ri),Size(S));
@@ -450,9 +453,9 @@ rec(validatesOrAlwaysValidInput := true),
 function(ri, G)
     local GM,S,pcgs;
     GM := Group(ri!.gensHmem);
-    GM!.pseudorandomfunc := [rec(
+    SetPseudoRandomFunctionAndArguments(GM, rec(
        func := function(ri) return RandomElm(ri,"PCGS",true).el; end,
-       args := [ri])];
+       args := [ri]));
     pcgs := Pcgs(GM);
     if pcgs = fail then
         return NeverApplicable;

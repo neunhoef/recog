@@ -191,7 +191,7 @@ InstallMethod( Eigenspaces, "for a field and a memory element matrix",
 #           sl3 := Group(genssm);
 #           pr := ProductReplacer(genssm,rec( maxdepth := 400, scramble := 0,
 #                                             scramblefactor := 0 ) );
-#           sl3!.pseudorandomfunc := [rec(func := Next,args := [pr])];
+#           SetPseudoRandomFunctionAndArguments(sl3, rec(func := Next,args := [pr]));
 #           res := RECOG.SL_FindSL2(sl3,f);
 #           if res = fail then
 #               if InfoLevel(InfoRecog) >= 3 then Print("#\c"); fi;
@@ -319,7 +319,7 @@ InstallMethod( Eigenspaces, "for a field and a memory element matrix",
 #       gl4 := Group(genssm);
 #       pr := ProductReplacer(genssm,rec( maxdepth := 400, scramble := 0,
 #                                         scramblefactor := 0 ) );
-#       gl4!.pseudorandomfunc := [rec(func := Next,args := [pr])];
+#       SetPseudoRandomFunctionAndArguments(gl4, rec(func := Next,args := [pr]));
 #       res := RECOG.SL_FindSL2(gl4,f);
 #       if res = fail then
 #           if InfoLevel(InfoRecog) >= 3 then Print("#\c"); fi;
@@ -3225,14 +3225,14 @@ function(ri, g)
       gg := GroupWithGenerators(gens);
       gm := GroupWithMemory(gens);
       pr := ProductReplacer(GeneratorsOfGroup(gm),rec(maxdepth := 500));
-      gm!.pseudorandomfunc := [rec( func := Next, args := [pr] )];
+      SetPseudoRandomFunctionAndArguments(gm, rec( func := Next, args := [pr]));
   else
       gg := g;
       gm := Group(ri!.gensHmem);
-      gm!.pseudorandomfunc := [rec(func := function(ri,name,bool)
+      SetPseudoRandomFunctionAndArguments(gm, rec(func := function(ri,name,bool)
                                       return RandomElm(ri,name,bool).el;
                                     end,
-                            args := [ri,"ClassicalNatural",true])];
+                            args := [ri,"ClassicalNatural",true]));
   fi;
 
   if d = 2 then

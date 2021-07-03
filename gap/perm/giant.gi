@@ -723,9 +723,9 @@ function(ri, grp)
         return TemporaryFailure;
     fi;
     grpmem := Group(ri!.gensHmem);
-    grpmem!.pseudorandomfunc := [rec(
+    SetPseudoRandomFunctionAndArguments(grpmem, rec(
        func := function(ri) return RandomElm(ri,"Giant",true).el; end,
-       args := [ri])];
+       args := [ri]));
 
     # Do constructive recognition for giants
     res := RECOG.RecogniseGiant(mp,grpmem,RECOG.GiantEpsilon);

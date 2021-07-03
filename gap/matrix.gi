@@ -512,8 +512,8 @@ end);
 #! The method immediately delegates to projective methods handling
 #! all the diagonal blocks projectively. This is done by giving a hint
 #! to the image to use the method
-#! <Ref Subsect="BlocksModScalars" Style="Text"/> is
-#! given. The method for the kernel then has to deal with only scalar blocks,
+#! <Ref Subsect="BlocksModScalars" Style="Text"/>.
+#! The method for the kernel then has to deal with only scalar blocks,
 #! either projectively or with scalars, which is again done by giving a hint
 #! to either use <Ref Subsect="BlockScalar" Style="Text"/> or
 #! <Ref Subsect="BlockScalarProj" Style="Text"/> respectively.
@@ -539,8 +539,9 @@ function(ri,G)
   Setmethodsforfactor(ri,FindHomDbProjective);
 
   # the kernel:
+  # The kernel is abelian, so we don't need to do normal closures.
+  findgensNmeth(ri).func := FindKernelRandom;
   findgensNmeth(ri).args[1] := Length(ri!.blocks)+10;
-  findgensNmeth(ri).args[2] := 7;
   # In the projective case we have to do a trick: We use an isomorphism
   # to a matrix group by multiplying things such that the last block
   # becomes an identity matrix:
@@ -552,6 +553,7 @@ function(ri,G)
       AddMethod(forkernel(ri).hints, FindHomMethodsMatrix.BlockScalar, 2000);
   fi;
   forkernel(ri).blocks := ri!.blocks;
+  Setimmediateverification(ri, true);
   return Success;
 end);
 
@@ -816,6 +818,9 @@ function(ri,G)
   SetHomom(ri,hom);
   # Now give hints downward:
   Setmethodsforfactor(ri,FindHomDbProjective);
+  # Make sure that immediate verification is performed to safeguard against the
+  # kernel being too small.
+  Setimmediateverification(ri, true);
   # note that RecogniseGeneric detects the use of FindHomDbProjective and
   # sets ri!.projective := true for the image
   # the kernel:

@@ -178,6 +178,19 @@ DeclareAttribute( "RIParent", IsRecogNode, "mutable" );
 ## <#/GAPDoc>
 DeclareAttribute( "StdPresentation", IsRecogNode, "mutable" );    # TODO: implement
 
+## <#GAPDoc Label="PseudoRandomFunctionAndArguments">
+## <ManSection>
+## <Attr Name="PseudoRandomFunctionAndArguments" Arg="G"/>
+## <Description>
+##     A record <C>r</C> with components <C>func</C> and <C>args</C>, such that
+##     calling <C>r.func</C> with arguments <C>r.args</C> computes a pseudo
+##     random element of <A>G</A>. A method which does so is istalled into
+##     <Ref Oper="PseudoRandom"/> for groups which have this attribute set.
+## </Description>
+## </ManSection>
+## <#/GAPDoc>
+DeclareAttribute( "PseudoRandomFunctionAndArguments", IsGroup, "mutable" );
+
 DeclareProperty( "IsRecogInfoForSimpleGroup", IsRecogNode );
 DeclareProperty( "IsRecogInfoForAlmostSimpleGroup", IsRecogNode );
 InstallTrueMethod( IsRecogInfoForAlmostSimpleGroup, IsRecogInfoForSimpleGroup );
@@ -615,6 +628,7 @@ DeclareGlobalFunction( "SLPforElementGeneric" );
 DeclareGlobalFunction( "SLPforElement" );
 DeclareOperation( "RandomElm", [ IsRecogNode, IsString, IsBool ] );
 DeclareOperation( "RandomElmOrd", [ IsRecogNode, IsString, IsBool ] );
+DeclareOperation( "RandomOrder", [ IsRecogNode, IsString, IsBool ] );
 DeclareOperation( "RandomElmPpd", [ IsRecogNode, IsString, IsBool ] );
 DeclareOperation( "RandomOrdersSeen", [ IsRecogNode ] );
 DeclareOperation( "StopStoringRandEls", [ IsRecogNode ] );

@@ -118,9 +118,9 @@ InstallGlobalFunction( DoHintedStabChain, function(ri,G,hint)
         return fail;
     fi;
     gm := Group(ri!.gensHmem);
-    gm!.pseudorandomfunc := [rec(
+    SetPseudoRandomFunctionAndArguments(gm, rec(
        func := function(ri) return RandomElm(ri,"StdGens",true).el; end,
-       args := [ri])];
+       args := [ri]));
     Info(InfoRecog,2,"Finding standard generators with bbox program...");
     stdgens := RunBBoxProgram(finder.program,gm,ri!.gensHmem,
                               rec( orderfunction := RECOG.ProjectiveOrder ) );
@@ -709,8 +709,8 @@ function(ri,G)
       Add(ri!.simplesoclerando,ProjectiveOrder(x)[1]);
   od;
   ri!.simplesoclerandp := 0;
-  ri!.simplesocle!.pseudorandomfunc :=
-       [rec( func := Next, args := [ri!.simplesoclepr] )];
+  SetPseudoRandomFunctionAndArguments(ri!.simplesocle,
+       rec( func := Next, args := [ri!.simplesoclepr] ));
   return NeverApplicable;
 end);
 

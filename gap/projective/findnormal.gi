@@ -556,7 +556,7 @@ InstallMethod( FindElmOfEvenNormalSubgroup, "for a group object and a record",
       if InfoLevel(InfoFindEvenNormal) >= 3 then Print("\n"); fi;
       c := GroupWithGenerators(centgens);
       prc := ProductReplacer(c,rec( scramblefactor := 3 ) );
-      c!.pseudorandomfunc := [rec( func := Next, args := [prc] )];
+      SetPseudoRandomFunctionAndArguments(c, rec( func := Next, args := [prc] ));
       return LookAtInvolutions(c,centinvols);
     end;
 
