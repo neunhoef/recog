@@ -175,10 +175,7 @@ InstallGlobalFunction( FastNormalClosure , function( grpgens, list, n )
     fi;
     for c in conjugators do
       if not IsOne(c) then
-        new := randlist ^ c;
-        if not new in list2 then
-          Add(list2,randlist ^ c);
-        fi;
+        Add(list2,randlist ^ c);
       fi;
     od;
     fi;
