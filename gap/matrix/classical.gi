@@ -1731,29 +1731,55 @@ RECOG.NonGenericOrthogonalPlus := function(recognise,grp)
         ## 2.July.2019: There is a mistake in the paper here
         ## There are maximal subgroups of Omega+(8,5) that contain
         ## elements of order 7,13,3
-        ## 13.Jan.2021: Added 31 and replaced 312 by 156. Elements with these
-        ## orders also exist in POmega+(8,5).
-        # TODO:
-        # - think again about why this distuinguishes (P)Omega+(8,5) from the
-        #   maximal subgroups of GO+.
-        # - write a comment that this works for projective and natural action.
-        # - do we need to use order(ri)(x) to get the projective orders?
-        # - how do we distinguish Omega+ and POmega+?
-        if not HasElementsMultipleOf( recognise.orders, [3,7,13,31,156])  then
+        ## 13.Jan.2021: Added 31
+        ## This means, in Table 4 of [NP99] the second column of the line "d =
+        ## 8, q = 5" should be "3, 7, 13, 31, 312 + perm.rep"
+        ## TODO: Bound the proportion of elms with orders 3, 31, 312
+        if not HasElementsMultipleOf( recognise.orders, [3,7,13,31,312])  then
             return fail;
         fi;
 
-        ## Such elements also exist in certain maximal subgroups of
-        ## Omega+(8,5). Thus we compute the projective action of grp on the
-        ## one-dimensional subspaces.
+        ## Such elements also exist in maximal subgroups of
+        ## Omega+(8,5) with composition factors being C_2 and Omega(0,7,5).
+        # Can we leave this out? All maximal subgroups
+        ## Thus we compute the projective action of grp on the one-dimensional
+        ## subspaces.
+        # TODO: Doing this takes 0.02 s in magma, but roughly 700ms in GAP
         pgrp := ProjectiveActionOnFullSpace( grp, recognise.field, d );
-        orbs := Orbits( pgrp, MovedPointsPerms( GeneratorsOfGroup(pgrp)));
+        orbs := Orbits(pgrp, MovedPoints(pgrp));
         if Set(orbs, Length) <> [ 19656, 39000 ] then
              recognise.isSOContained := false;
              return false;
         fi;
+        # BEGIN
+        # Here is an idea for a check which does not need to compute the whole
+        # Base and SGS:
+        # Take
+        # grp := Omega(+1, 8, 5); field := GF(5); d := 8;
+        # or
+        # grp := GO(+1, 8, 5); field := GF(5); d := 8;
+        # Then we can prove that 13^2 divides the group order as follows:
+        # pgrp := ProjectiveActionOnFullSpace( grp, field, d );
+        # orbs := Orbits(pgrp, MovedPoints(pgrp));
+        # List(orbs, Length); # one of them has length 19656
+        # S := Stabilizer(pgrp, 1); # choose a point in the orbit with length 19656
+        # orbsStab := Orbits(S, MovedPoints(S));
+        # List(orbsStab, x -> Length(x) mod 13);
+        # If we find an orbit of length divisible by 13 in the last line, then
+        # 13^2 divides our group order, and then we must contain Omega+(8,5).
+        # END
+        # TESTS BEGIN
+        # The generators of Omega+(8,5) in Magma and GAP are identical! So it
+        # should be trivial to get generators for the maximal subgroups.
+        # END
         ## There are maximal subgroups that have the same orbit sizes as above.
         ## So we need to compare the size of pgrp to the size of POmega(+1,8,5).
+        # TODO: we can stop once 2^11, 3^5 or 5^10 or 13^2 divide our group
+        # order
+        # gap> Collected(FactorsInt(Size(G)));
+        # [ [ 2, 13 ], [ 3, 5 ], [ 5, 12 ], [ 7, 1 ], [ 13, 2 ], [ 31, 1 ] ]
+        # gap> Collected(FactorsInt(2 * Size(Omega(0,7,5))));
+        # [ [ 2, 10 ], [ 3, 4 ], [ 5, 9 ], [ 7, 1 ], [ 13, 1 ], [ 31, 1 ] ]
         if Size(pgrp) mod 8911539000000000000 = 0 then # compare to Size(POmega(+1,8,5))
              return CheckFlag();
         else
