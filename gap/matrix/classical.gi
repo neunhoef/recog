@@ -1716,11 +1716,6 @@ RECOG.NonGenericOrthogonalPlus := function(recognise,grp)
             return fail;
         fi;
         pgrp := ProjectiveActionOnFullSpace( grp, recognise.field, d );
-        orbs := Orbits( pgrp, MovedPointsPerms( GeneratorsOfGroup(pgrp)));
-        if Set(orbs, Length) <> [ 1080, 1120 ] then
-             recognise.isSOContained := false;
-             return false;
-        fi;
         if Size(pgrp) mod 4952179814400 = 0 then # compare to Size(POmega(+1,8,3))
              return CheckFlag();
         else
@@ -1835,6 +1830,9 @@ RECOG.NonGenericOrthogonalPlus := function(recognise,grp)
                 return CheckFlag();
         fi;
     elif d = 4 and q =  4 then
+        # TODO: check all occurences of Orbit and Orbits for the "conformals
+        # can merge orbits"-bug.
+
         if not Length( Orbit( grp, IdentityMat(d, GF(q))[1]) ) in [75,60] then
             return false;
         fi;
