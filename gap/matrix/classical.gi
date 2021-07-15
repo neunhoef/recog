@@ -1764,9 +1764,14 @@ RECOG.NonGenericOrthogonalPlus := function(recognise,grp)
         pgrp := ProjectiveActionOnFullSpace( grp, recognise.field, d );
         # We take a value for random of only 100 promille, but in practice this
         # seems to be good enough.
+        # TODO: The orders of the remaining maximal subgroups are not divisible
+        # by e.g. 13^2. Also, passing to the projective action reduces the
+        # involved group sizes by a factor of at most 4. So, if we know that
+        # the order of pgrp is divisible by Size(POmega(+1,8,5)), then this
+        # excludes the remaining maximal subgroups.
         # TODO: IsSOContained -> IsOmegaContained
         StabChain(pgrp, rec(random := 200, limit := 8911539000000000000));
-        if Size(pgrp) mod 8911539000000000000 = 0 then # compare to Size(POmega(+1,8,5))
+        if Size(pgrp) mod 8911539000000000000 = 0 then
              return CheckFlag();
         else
              return fail;
